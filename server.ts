@@ -11,16 +11,26 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// Initialize Gemini
-// Must set 'User-Agent': 'aistudio-build' in httpOptions for telemetry per skill instructions
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
+// Initialize Gemini helper function for lazy loading and better error handling
+let aiInstance: GoogleGenAI | null = null;
+
+function getAiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured on the server. Please write your Gemini API key in the Secrets panel of AI Studio.");
   }
-});
+  if (!aiInstance) {
+    aiInstance = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+  }
+  return aiInstance;
+}
 
 // API Routes
 app.post("/api/campaign/content", async (req, res) => {
@@ -30,9 +40,7 @@ app.post("/api/campaign/content", async (req, res) => {
       return res.status(400).json({ error: "Prompt is required" });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
-    }
+    const ai = getAiClient();
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
@@ -116,9 +124,7 @@ app.post("/api/campaign/visual", async (req, res) => {
   }
 
   try {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not configured on the server.");
-    }
+    const ai = getAiClient();
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image",

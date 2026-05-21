@@ -36,9 +36,9 @@ export default function App() {
         // We still have the text content
       }
 
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError('System failure. Could not orchestrate campaign generation.');
+      setError(err?.message || 'System failure. Could not orchestrate campaign generation.');
     } finally {
       setIsGenerating(false);
     }
