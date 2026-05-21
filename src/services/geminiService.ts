@@ -1,77 +1,37 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { CampaignAsset } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-
 export const generateCampaignContent = async (userPrompt: string): Promise<CampaignAsset> => {
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: `Generate a comprehensive email marketing campaign based on the following request: "${userPrompt}". 
-    Include 3 catchy subject lines, highly engaging body copy (with placeholders for name/company), a descriptive image generation prompt for the main visual, target audience description, tone of voice, and a strong call to action.`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          subjectLines: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: "3 varying subject lines"
-          },
-          bodyCopy: {
-            type: Type.STRING,
-            description: "The full HTML/Markdown-ready body copy of the email"
-          },
-          imagePrompt: {
-            type: Type.STRING,
-            description: "A detailed prompt for generating a visual asset that matches the campaign mood"
-          },
-          targetAudience: {
-            type: Type.STRING,
-            description: "Description of who this email is targeting"
-          },
-          tone: {
-            type: Type.STRING,
-            description: "The stylistic tone of the writing"
-          },
-          callToAction: {
-            type: Type.STRING,
-            description: "The primary button or link text"
-          }
-        },
-        required: ["subjectLines", "bodyCopy", "imagePrompt", "targetAudience", "tone", "callToAction"]
-      }
-    }
+  const response = await fetch("/api/campaign/content", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ prompt: userPrompt })
   });
 
-  try {
-    return JSON.parse(response.text.trim()) as CampaignAsset;
-  } catch (e) {
-    console.error("Failed to parse campaign JSON:", e);
-    throw new Error("Invalid response format from AI");
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || "Failed to generate campaign content from server");
   }
+
+  return response.json();
 };
 
 export const generateCampaignVisual = async (imagePrompt: string): Promise<string> => {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-image",
-    contents: {
-      parts: [
-        { text: `${imagePrompt}. Professional, high-quality commercial photography, clean composition, minimalist.` }
-      ]
+  const response = await fetch("/api/campaign/visual", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
     },
-    config: {
-      imageConfig: {
-        aspectRatio: "16:9"
-      }
-    }
+    body: JSON.stringify({ imagePrompt })
   });
 
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      return `data:image/png;base64,${part.inlineData.data}`;
-    }
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || "Failed to generate campaign visual from server");
   }
-  
-  throw new Error("No image was generated");
+
+  const data = await response.json();
+  return data.imageUrl;
 };
+
